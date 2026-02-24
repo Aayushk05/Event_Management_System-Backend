@@ -18,47 +18,78 @@ const User = require("./models/User");
 
 const app = express();
 const server = http.createServer(app);
-const io = initSocket(server);
 
-app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
+const allowedOrigins = [
+  "https://eventmanagementsystema1-frontend.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true
+}));
+
 app.use(express.json({ limit: "10mb" }));
 
+// Initialize Socket.io with the server
+const io = initSocket(server);
+
+// Middleware for Socket Authentication
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error("No token provided"));
   try {
-    socket.user = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
     next();
-  } catch {
+  } catch (err) {
     next(new Error("Invalid token"));
   }
 });
 
+// Socket Connection Logic
 io.on("connection", (socket) => {
+  console.log("New client connected:", socket.id);
+
   // Forum rooms - join/leave per event
   socket.on("join_forum", (eventId) => {
     socket.join(`forum_${eventId}`);
+    console.log(`User ${socket.user.id} joined forum_${eventId}`);
   });
+
   socket.on("leave_forum", (eventId) => {
     socket.leave(`forum_${eventId}`);
   });
 
-  // Typing indicator - broadcast to others in same forum room
+  // Typing indicator
   socket.on("typing", ({ eventId }) => {
     socket.to(`forum_${eventId}`).emit("user_typing", {
       userId: socket.user.id,
       role: socket.user.role
     });
   });
+
   socket.on("stop_typing", ({ eventId }) => {
     socket.to(`forum_${eventId}`).emit("user_stop_typing", {
       userId: socket.user.id
     });
   });
 
-  socket.on("disconnect", () => {});
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
+  });
 });
 
+// Database Connection & Admin Seed
 const seedAdmin = async () => {
   try {
     const adminExists = await User.findOne({ role: "admin" });
@@ -71,9 +102,9 @@ const seedAdmin = async () => {
         role: "admin",
         isActive: true
       });
-      console.log("Admin created");
+      console.log("Admin created successfully");
     } else {
-      console.log("Admin already exists. Skipping.");
+      console.log("Admin already exists. Skipping seed.");
     }
   } catch (err) {
     console.error("Admin seed error:", err.message);
@@ -86,17 +117,18 @@ mongoose
     console.log("MongoDB connected");
     await seedAdmin();
   })
-  .catch((err) => console.error("MongoDB error:", err.message));
+  .catch((err) => console.error("MongoDB connection error:", err.message));
 
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/participant", participantRoutes);
 app.use("/api/events", eventRoutes);
-app.use("/api/events", forumRoutes);  // forum lives under /api/events/:id/forum
+app.use("/api/events", forumRoutes); 
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/organiser", organizerRoutes);
 
-app.get("/", (req, res) => res.json({ status: "Felicity API running" }));
+app.get("/", (req, res) => res.json({ status: "Felicity API running", version: "1.0.0" }));
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
