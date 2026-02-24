@@ -7,15 +7,21 @@ const getTransporter = async () => {
   if (transporter) return transporter;
 
   if (process.env.EMAIL_USER) {
-    console.log("Initializing Gmail Service...");
+    console.log("Initializing Gmail Service (IPv4 Forced)...");
     transporter = nodemailer.createTransport({
-      service: "gmail",
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      tls: {
+        rejectUnauthorized: true,
+      },
+      family: 4, 
     });
-    console.log(`Email transporter active for: ${process.env.EMAIL_USER}`);
+    console.log(`📧 Email transporter active for: ${process.env.EMAIL_USER}`);
   } else {
     console.log("No EMAIL_USER found in .env, using Ethereal fallback");
     const testAccount = await nodemailer.createTestAccount();
@@ -48,7 +54,7 @@ const sendTicketEmail = async (userEmail, ticketId, eventName, userName) => {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
         <div style="background: #1a1a2e; color: white; padding: 24px; text-align: center;">
-          <h1 style="margin: 0;">Your Event Ticket</h1>
+          <h1 style="margin: 0;">🎟️ Your Event Ticket</h1>
         </div>
         <div style="padding: 24px;">
           <p>Hello <strong>${userName}</strong>,</p>
@@ -81,7 +87,7 @@ const sendTicketEmail = async (userEmail, ticketId, eventName, userName) => {
     console.log(`Ticket email sent to ${userEmail}`);
     
     const preview = nodemailer.getTestMessageUrl(info);
-    if (preview) console.log("Preview URL:", preview);
+    if (preview) console.log("📬 Preview URL:", preview);
 
   } catch (err) {
     console.error("Email send error:", err.message);
