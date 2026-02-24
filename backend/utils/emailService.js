@@ -3,7 +3,7 @@ const QRCode = require("qrcode");
 const dns = require("dns");
 const util = require("util");
 
-// Promisify DNS resolve to use with await
+// Promisify DNS resolve
 const resolve4 = util.promisify(dns.resolve4);
 
 let transporter = null;
@@ -15,42 +15,35 @@ const getTransporter = async () => {
     try {
       console.log("🌐 Resolving smtp.gmail.com to IPv4 manually...");
       
-      // 1. Manually find the IPv4 address for Gmail
+      // 1. Manually find the IPv4 address
       const addresses = await resolve4("smtp.gmail.com");
-      const gmailIp = addresses[0]; // Take the first IPv4 address found
+      const gmailIp = addresses[0]; 
       
-      console.log(`✅ Resolved Gmail to: ${gmailIp} (Bypassing DNS lookup)`);
-
-      console.log("🚀 Creating Transporter with DIRECT IP connection...");
+      console.log(`✅ Resolved Gmail to: ${gmailIp}`);
+      console.log("🚀 Connecting via Port 587 (STARTTLS)...");
       
       transporter = nodemailer.createTransport({
-        host: gmailIp,           // 2. Connect directly to the IP, not the domain
-        port: 465,
-        secure: true,
+        host: gmailIp,           // Direct IP
+        port: 587,               // 🔹 CHANGE: Use Port 587
+        secure: false,           // 🔹 CHANGE: Must be false for 587
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS,
         },
         tls: {
-          // 3. IMPORTANT: Tell TLS we are actually visiting smtp.gmail.com
-          // (Required because the IP address doesn't match the certificate)
+          // Tell TLS we are visiting smtp.gmail.com (matches cert)
           servername: "smtp.gmail.com", 
+          rejectUnauthorized: true,
         }
       });
       
-      console.log(`📧 Email transporter active for: ${process.env.EMAIL_USER}`);
+      console.log(`📧 Email transporter configured for: ${process.env.EMAIL_USER}`);
       
     } catch (error) {
-      console.error("❌ Failed to resolve Gmail IP:", error.message);
-      // Fallback: Try standard connection if manual resolution fails
-      transporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-      });
+      console.error("❌ Setup Failed:", error.message);
     }
   } else {
     // Development fallback
-    console.log("⚠️ No EMAIL_USER found in .env, using Ethereal");
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
       host: "smtp.ethereal.email",
@@ -106,13 +99,13 @@ const sendTicketEmail = async (userEmail, ticketId, eventName, userName) => {
       ],
     });
 
-    console.log(`✅ Ticket email sent to ${userEmail}`);
+    console.log(`Ticket email sent to ${userEmail}`);
     
     const preview = nodemailer.getTestMessageUrl(info);
-    if (preview) console.log("📬 Preview URL:", preview);
+    if (preview) console.log("Preview URL:", preview);
 
   } catch (err) {
-    console.error("❌ Email send error:", err.message);
+    console.error("Email send error:", err.message);
   }
 };
 
