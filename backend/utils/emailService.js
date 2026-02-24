@@ -1,6 +1,10 @@
 const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
 const dns = require("dns");
+const util = require("util");
+
+// Promisify DNS resolve to use with await
+const resolve4 = util.promisify(dns.resolve4);
 
 let transporter = null;
 
@@ -8,24 +12,44 @@ const getTransporter = async () => {
   if (transporter) return transporter;
 
   if (process.env.EMAIL_USER) {
-    // 🔹 I changed this log so you can PROVE the code updated
-    console.log("🚀 Creating Transporter (v465) - Force IPv4...");
-    
-    transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 465,               // Hardcoded 465 (SSL)
-      secure: true,            // Hardcoded true
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      // DNS Interceptor to force IPv4
-      lookup: (hostname, options, callback) => {
-        dns.lookup(hostname, { family: 4 }, callback);
-      },
-    });
-    console.log(`📧 Email transporter active for: ${process.env.EMAIL_USER}`);
+    try {
+      console.log("🌐 Resolving smtp.gmail.com to IPv4 manually...");
+      
+      // 1. Manually find the IPv4 address for Gmail
+      const addresses = await resolve4("smtp.gmail.com");
+      const gmailIp = addresses[0]; // Take the first IPv4 address found
+      
+      console.log(`✅ Resolved Gmail to: ${gmailIp} (Bypassing DNS lookup)`);
+
+      console.log("🚀 Creating Transporter with DIRECT IP connection...");
+      
+      transporter = nodemailer.createTransport({
+        host: gmailIp,           // 2. Connect directly to the IP, not the domain
+        port: 465,
+        secure: true,
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+        tls: {
+          // 3. IMPORTANT: Tell TLS we are actually visiting smtp.gmail.com
+          // (Required because the IP address doesn't match the certificate)
+          servername: "smtp.gmail.com", 
+        }
+      });
+      
+      console.log(`📧 Email transporter active for: ${process.env.EMAIL_USER}`);
+      
+    } catch (error) {
+      console.error("❌ Failed to resolve Gmail IP:", error.message);
+      // Fallback: Try standard connection if manual resolution fails
+      transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+      });
+    }
   } else {
+    // Development fallback
     console.log("⚠️ No EMAIL_USER found in .env, using Ethereal");
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
