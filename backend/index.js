@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const { init: initSocket } = require("./socket");
 
+// Import Routes
 const authRoutes = require("./routes/auth");
 const participantRoutes = require("./routes/participant");
 const eventRoutes = require("./routes/event");
@@ -19,17 +20,19 @@ const User = require("./models/User");
 const app = express();
 const server = http.createServer(app);
 
+
 const allowedOrigins = [
-  "https://eventmanagementsystema1-frontend.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000"
+  "https://eventmanagementsystema1-frontend.vercel.app", 
+  "http://localhost:5173", 
+  "http://localhost:3000"  
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+    
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
       return callback(new Error(msg), false);
     }
     return callback(null, true);
@@ -40,10 +43,8 @@ app.use(cors({
 
 app.use(express.json({ limit: "10mb" }));
 
-// Initialize Socket.io with the server
 const io = initSocket(server);
 
-// Middleware for Socket Authentication
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error("No token provided"));
@@ -56,21 +57,18 @@ io.use((socket, next) => {
   }
 });
 
-// Socket Connection Logic
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
-  // Forum rooms - join/leave per event
   socket.on("join_forum", (eventId) => {
     socket.join(`forum_${eventId}`);
-    console.log(`User ${socket.user.id} joined forum_${eventId}`);
+     console.log(`User ${socket.user.id} joined forum_${eventId}`);
   });
 
   socket.on("leave_forum", (eventId) => {
     socket.leave(`forum_${eventId}`);
   });
 
-  // Typing indicator
   socket.on("typing", ({ eventId }) => {
     socket.to(`forum_${eventId}`).emit("user_typing", {
       userId: socket.user.id,
@@ -85,11 +83,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
+     console.log("Client disconnected:", socket.id);
   });
 });
 
-// Database Connection & Admin Seed
+// 
 const seedAdmin = async () => {
   try {
     const adminExists = await User.findOne({ role: "admin" });
@@ -119,7 +117,7 @@ mongoose
   })
   .catch((err) => console.error("MongoDB connection error:", err.message));
 
-// Routes
+
 app.use("/api/auth", authRoutes);
 app.use("/api/participant", participantRoutes);
 app.use("/api/events", eventRoutes);
