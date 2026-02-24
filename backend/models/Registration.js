@@ -13,13 +13,13 @@ const registrationSchema = new mongoose.Schema(
 
     // Merchandise order fields
     variantId: { type: mongoose.Schema.Types.ObjectId },
-    quantity:  { type: Number, default: 1 },: Payment approval workflow
+    quantity:  { type: Number, default: 1 },
     paymentProofUrl: { type: String },
     paymentStatus: {
       type: String,
       enum: ["Not Applicable", "Pending", "Approved", "Rejected"],
       default: "Not Applicable"
-    },: QR attendance tracking
+    },
     attended:             { type: Boolean, default: false },
     attendanceTimestamp:  { type: Date },
     manualOverride:       { type: Boolean, default: false },
