@@ -8,34 +8,32 @@ const getTransporter = async () => {
   if (transporter) return transporter;
 
   if (process.env.EMAIL_USER) {
-    console.log("Initializing Gmail Service...");
+    // 🔹 I changed this log so you can PROVE the code updated
+    console.log("🚀 Creating Transporter (v465) - Force IPv4...");
+    
     transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
-      port: 465,
-      secure: true, 
+      port: 465,               // Hardcoded 465 (SSL)
+      secure: true,            // Hardcoded true
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      // DNS Interceptor to force IPv4
       lookup: (hostname, options, callback) => {
         dns.lookup(hostname, { family: 4 }, callback);
       },
     });
-    console.log(`Email transporter active for: ${process.env.EMAIL_USER}`);
+    console.log(`📧 Email transporter active for: ${process.env.EMAIL_USER}`);
   } else {
-    console.log("No EMAIL_USER found in .env, using Ethereal fallback");
+    console.log("⚠️ No EMAIL_USER found in .env, using Ethereal");
     const testAccount = await nodemailer.createTestAccount();
     transporter = nodemailer.createTransport({
       host: "smtp.ethereal.email",
       port: 587,
       secure: false,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
+      auth: { user: testAccount.user, pass: testAccount.pass },
     });
-    console.log("Email transporter: Ethereal (Development Mode)");
-    console.log("Preview emails at: https://ethereal.email");
   }
 
   return transporter;
@@ -84,13 +82,13 @@ const sendTicketEmail = async (userEmail, ticketId, eventName, userName) => {
       ],
     });
 
-    console.log(`Ticket email sent to ${userEmail}`);
+    console.log(`✅ Ticket email sent to ${userEmail}`);
     
     const preview = nodemailer.getTestMessageUrl(info);
     if (preview) console.log("📬 Preview URL:", preview);
 
   } catch (err) {
-    console.error("Email send error:", err.message);
+    console.error("❌ Email send error:", err.message);
   }
 };
 
