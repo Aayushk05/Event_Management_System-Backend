@@ -1,5 +1,6 @@
 const nodemailer = require("nodemailer");
 const QRCode = require("qrcode");
+const dns = require("dns");
 
 let transporter = null;
 
@@ -7,16 +8,18 @@ const getTransporter = async () => {
   if (transporter) return transporter;
 
   if (process.env.EMAIL_USER) {
-    console.log("Initializing Gmail Service (Port 465 / IPv4)...");
+    console.log("Initializing Gmail Service...");
     transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
-      port: 465,              
-      secure: true,            
+      port: 465,
+      secure: true, 
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      family: 4,               
+      lookup: (hostname, options, callback) => {
+        dns.lookup(hostname, { family: 4 }, callback);
+      },
     });
     console.log(`Email transporter active for: ${process.env.EMAIL_USER}`);
   } else {
@@ -84,7 +87,7 @@ const sendTicketEmail = async (userEmail, ticketId, eventName, userName) => {
     console.log(`Ticket email sent to ${userEmail}`);
     
     const preview = nodemailer.getTestMessageUrl(info);
-    if (preview) console.log("Preview URL:", preview);
+    if (preview) console.log("📬 Preview URL:", preview);
 
   } catch (err) {
     console.error("Email send error:", err.message);
